@@ -3,7 +3,8 @@
 connector_image: airbyte/source-cloudwatch-logs:dev
 acceptance_tests:
   spec:
-    tests: []
+    tests:
+      - spec_path: "source_cloudwatch_logs/spec.json"
   connection:
     tests:
       - config_path: "secrets/config.json"
