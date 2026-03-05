@@ -31,4 +31,5 @@ data:
     - language:manifest-only
   connectorTestSuitesOptions:
     - suite: unitTests
+    - suite: acceptanceTests
 metadataSpecVersion: "1.0"
