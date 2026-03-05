@@ -3,7 +3,7 @@ data:
     hosts:
       - "*.amazonaws.com"
   connectorBuildOptions:
-    baseImage: docker.io/airbyte/source-declarative-manifest:6.51.0@sha256:890b109f243b8b9406f23ea7522de41025f7b3e87f6fc9710bc1e521213a276f
+    baseImage: docker.io/airbyte/python-connector-base:4.1.0@sha256:1d1aa21d34e851df4e8a87b391c27724c06e2597608e7161f4d167be853bd7b6
   connectorSubtype: api
   connectorType: source
   definitionId: f88d2297-b0c6-40a5-adc7-e7fd845b1cf6
@@ -21,14 +21,15 @@ data:
       packageName: airbyte-source-cloudwatch-logs
   registryOverrides:
     cloud:
-      enabled: true
+      enabled: false
     oss:
       enabled: true
   releaseStage: generally_available
   supportLevel: community
   tags:
-    - cdk:low-code
-    - language:manifest-only
+    - language:python
+    - cdk:python
   connectorTestSuitesOptions:
     - suite: unitTests
+    - suite: acceptanceTests
 metadataSpecVersion: "1.0"
