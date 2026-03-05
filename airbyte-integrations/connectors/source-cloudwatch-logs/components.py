@@ -2,7 +2,7 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 
-from dataclasses import dataclass, InitVar
+from dataclasses import dataclass
 from typing import Any, Mapping, Optional, MutableMapping, Union, Callable
 
 import boto3
@@ -22,7 +22,6 @@ class Boto3Authenticator(DeclarativeAuthenticator):
     provided in the configuration.
     """
     config: Config
-
     _session: boto3.Session
 
     def __post_init__(self):
@@ -68,27 +67,15 @@ class Boto3Authenticator(DeclarativeAuthenticator):
 
 
 @dataclass
-class Boto3LogRequester(Requester):
-    region_name: str
-    log_group_name: str
-    name: str
-    authenticator: Boto3Authenticator
-    parameters: InitVar[Mapping[str, Any]]
+class Boto3Requester(Requester):
 
     # Use self.logger in subclasses to log any messages
-
-    def __post_init__(self, parameters: Mapping[str, Any]) -> None:
-        self._session = self.authenticator._session
-        self._client = self._session.client("logs")
-        self._name = self.name
-        self._parameters = parameters
-
     @property
     def logger(self) -> logging.Logger:
         return logging.getLogger(f"airbyte.Boto3Requester")
 
     def get_authenticator(self) -> DeclarativeAuthenticator:
-        return self.authenticator
+        return Boto3Authenticator
 
     def get_url(
         self,
@@ -130,19 +117,19 @@ class Boto3LogRequester(Requester):
         stream_slice: Optional[StreamSlice] = None,
         next_page_token: Optional[Mapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
-        stream_slice = stream_slice or {}
         current_time = int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)  # milliseconds
-        start_time = stream_slice.get("start_time", 0)
-        end_time = stream_slice.get("end_time", current_time)
-
-        params = {
+        if stream_slice:
+            start_time = stream_slice.get("start_time", 0)
+            end_time = stream_slice.get("end_time", current_time)
+        else:
+            start_time = 0
+            end_time = current_time
+        return {
             "logGroupName": self.log_group_name,
             "startTime": start_time,
             "endTime": end_time,
             "limit": 10000,
         }
-        self.logger.info(f"Fetching log events with parameters: {params}")
-        return params
 
     def get_request_headers(
         self,
@@ -183,10 +170,46 @@ class Boto3LogRequester(Requester):
         request_body_json: Optional[Mapping[str, Any]] = None,
         log_formatter: Optional[Callable[[requests.Response], Any]] = None,
     ) -> Optional[requests.Response]:
-        params = request_params or {}
+        return self.read_records(
+            sync_mode=SyncMode.incremental,
+            cursor_field=self.cursor_field,
+            stream_slice=stream_slice,
+            stream_state=stream_state,
+        )
 
-        if next_page_token:
-            params["nextToken"] = next_page_token
+    def read_records(
+        self,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+    ) -> Iterable[StreamData]:
+        stream_slice = stream_slice or {}
 
-        response = self._client.filter_log_events(**params, **self._parameters)
-        return response
+        start_time = stream_slice.get("start_time", 0)
+        end_time = stream_slice.get("end_time")
+        self._logger.info(f"Fetching logs from: {start_time} to {end_time} for group: {self.log_group_name}")
+
+        next_token = None
+        while True:
+            params = {
+                "logGroupName": self.log_group_name,
+                "startTime": start_time,
+                "endTime": end_time,
+                "limit": 10000,
+            }
+            self.logger.debug(f"Fetching log events with parameters: {params}")
+
+            if next_token:
+                params["nextToken"] = next_token
+
+            response = self.client.filter_log_events(**params, **self.kwargs)
+            events = response.get("events", [])
+
+            for event in events:
+                if self._cursor_value is None:
+                    self._cursor_value = event[self.cursor_field]
+                else:
+                    self._cursor_value = max(event[self.cursor_field], self._cursor_value)
+                yield event
+
+            next_token = response.get("nextToken")
+            if not next_token:
+                break
