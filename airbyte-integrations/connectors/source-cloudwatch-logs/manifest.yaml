@@ -74,7 +74,7 @@ definitions:
   # -----------------------------------------------------------------------
   logs_partition_router:
     type: CustomPartitionRouter
-    class_name: "components.CloudWatchLogsPartitionRouter"
+    class_name: "source_declarative_manifest.components.CloudWatchLogsPartitionRouter"
     # All config fields are automatically injected by the framework.
 
   # -----------------------------------------------------------------------
@@ -82,7 +82,7 @@ definitions:
   # -----------------------------------------------------------------------
   logs_retriever:
     type: CustomRetriever
-    class_name: "components.CloudWatchLogsRetriever"
+    class_name: "source_declarative_manifest.components.CloudWatchLogsRetriever"
     # All config fields are automatically injected by the framework.
 
   # -----------------------------------------------------------------------
